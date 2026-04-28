@@ -72,6 +72,8 @@ object Defines {
     @BooleanConfig const val hideTimeForSticker = "hideTimeForSticker"
     @BooleanConfig const val showMessageID = "showMessageID"
     @BooleanConfig const val hideQuickSendMediaBottom = "hideQuickSendMediaButtom"
+    @BooleanConfig(true) const val quickSendMediaPopup = "quickSendMediaPopup"
+    const val quickSendMediaLastDismissedId = "quickSendMediaLastDismissedId"
     @BooleanConfig const val largeAvatarAsBackground = "largeAvatarAsBackground"
     @BooleanConfig const val useSystemEmoji = "useSystemEmoji"
     const val customQuickMessage = "customQuickCommand"
@@ -142,6 +144,11 @@ object Defines {
     @BooleanConfig const val showCopyPhoto = "showCopyPhoto"
     @BooleanConfig(true) const val showReport = "showReport"
     @BooleanConfig(true) const val showReactions = "showReactions"
+
+    // Compact (icon-only) message menu — CSV of OPTION_* ints rendered as icon
+    @StringConfig("") const val compactMessageOptions = "compactMessageOptions"
+    // Hidden message menu options — CSV of OPTION_* ints stripped from the popup
+    @StringConfig("") const val hiddenMessageOptions = "hiddenMessageOptions"
 
     // custom double tap
     @IntConfig(doubleTabReaction)

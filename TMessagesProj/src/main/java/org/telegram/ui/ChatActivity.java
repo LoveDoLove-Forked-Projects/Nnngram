@@ -104,6 +104,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -354,12 +355,14 @@ import xyz.nextalone.nnngram.config.ConfigManager;
 import xyz.nextalone.nnngram.config.DialogConfig;
 import xyz.nextalone.nnngram.config.ForwardContext;
 import xyz.nextalone.nnngram.helpers.MessageHelper;
+import xyz.nextalone.nnngram.helpers.MessageMenuCompact;
 import xyz.nextalone.nnngram.helpers.MentionReadHelper;
 import xyz.nextalone.nnngram.helpers.QrHelper;
 import xyz.nextalone.nnngram.helpers.TranslateHelper;
 import xyz.nextalone.nnngram.helpers.TranslateHelper.Status;
 import xyz.nextalone.nnngram.translate.LanguageDetectorTimeout;
 import xyz.nextalone.nnngram.ui.BackButtonRecentMenu;
+import xyz.nextalone.nnngram.ui.QuickSendMediaPopup;
 import xyz.nextalone.nnngram.ui.TranslatorSettingsPopupWrapper;
 import xyz.nextalone.nnngram.ui.sortList.items.TextStyleItems;
 import xyz.nextalone.nnngram.utils.Defines;
@@ -507,6 +510,9 @@ public class ChatActivity extends BaseFragment implements
     private ChatNotificationsPopupWrapper chatNotificationsPopupWrapper;
     // private ChatActivitySideControlsButtonsLayout topButtonsLayout;
     private ChatActivitySideControlsButtonsLayout sideControlsButtonsLayout;
+    private QuickSendMediaPopup quickSendMediaPopup;
+    private long quickSendPauseTimeSec;
+    private final java.util.HashSet<Long> quickSendDismissedIds = new java.util.HashSet<>();
     private ActionBarMenuItem.Item hideTitleItem;
     /* private float pagedownButtonEnterProgress;
     private float searchUpDownEnterProgress;
@@ -7353,6 +7359,12 @@ public class ChatActivity extends BaseFragment implements
         sideControlsButtonsLayout.setOnLongClickListener(this::onSideControlButtonOnLongClick);
         contentView.addView(sideControlsButtonsLayout, LayoutHelper.createFrame(57, 300, Gravity.RIGHT | Gravity.BOTTOM));
 
+        quickSendMediaPopup = new QuickSendMediaPopup(context);
+        // Sits at the bottom-right of the chat, right-aligned with the
+        // scroll-to-bottom button and just above it, so it reads as a
+        // proper bottom-right affordance above the input bar.
+        contentView.addView(quickSendMediaPopup, LayoutHelper.createFrame(72, 72, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 6, 60));
+
         contentView.addView(topPanelLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 
         updateMessageListAccessibilityVisibility();
@@ -11109,6 +11121,9 @@ public class ChatActivity extends BaseFragment implements
                 - getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)
                 - dp(ChatInputViewsContainer.INPUT_BUBBLE_BOTTOM + 4);
             sideControlsButtonsLayout.setTranslationY(baseTranslationY2);
+            if (quickSendMediaPopup != null) {
+                quickSendMediaPopup.setTranslationY(baseTranslationY2);
+            }
         }
 
         if (suggestEmojiPanel != null) {
@@ -29757,6 +29772,8 @@ public class ChatActivity extends BaseFragment implements
         if (starReactionsOverlay != null) {
             starReactionsOverlay.bringToFront();
         }
+
+        checkQuickSendMediaPopup();
     }
 
     public float getPullingDownOffset() {
@@ -29770,6 +29787,157 @@ public class ChatActivity extends BaseFragment implements
         } else {
             AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
         }
+    }
+
+    private void checkQuickSendMediaPopup() {
+        if (!Config.quickSendMediaPopup || quickSendMediaPopup == null) {
+            return;
+        }
+        if (chatMode != 0 || inPreviewMode || inBubbleMode || isReport() || isInsideContainer) {
+            return;
+        }
+        if (getParentActivity() == null || currentEncryptedChat != null) {
+            // Skip secret chats to avoid surprising users with a separate send path.
+            return;
+        }
+        if (currentChat != null && !ChatObject.canSendPhoto(currentChat)) {
+            return;
+        }
+        if (!xyz.nextalone.nnngram.utils.PermissionUtils.isImagesPermissionGranted()) {
+            return;
+        }
+        final long sinceSec;
+        if (quickSendPauseTimeSec > 0) {
+            // Only show photos added while we were away from this chat.
+            sinceSec = quickSendPauseTimeSec;
+        } else {
+            // First time entering: look back 3 minutes for a freshly taken shot.
+            sinceSec = System.currentTimeMillis() / 1000L - 180L;
+        }
+        final long persistedDismissedId = xyz.nextalone.nnngram.config.ConfigManager
+            .getLongOrDefault(xyz.nextalone.nnngram.utils.Defines.quickSendMediaLastDismissedId, 0L);
+        QuickSendMediaPopup.queryLatestImage(sinceSec, entry -> {
+            if (entry == null || quickSendMediaPopup == null || paused) {
+                return;
+            }
+            if (entry.id <= persistedDismissedId) {
+                // Previously dismissed across sessions - MediaStore imageIds increase
+                // monotonically, so anything at or below the watermark is old news.
+                return;
+            }
+            if (quickSendDismissedIds.contains(entry.id)) {
+                return;
+            }
+            if (quickSendMediaPopup.isShowingFor(entry.id)) {
+                return;
+            }
+            // The photo is about to be surfaced once; persist the dismissal
+            // watermark immediately so that *any* exit path (send, cancel
+            // from the preview, 10s timeout, leaving the chat, process
+            // restart) counts as "already seen" and the same image is not
+            // surfaced a second time.
+            rememberQuickSendDismissed(entry);
+            quickSendMediaPopup.show(entry, new QuickSendMediaPopup.Delegate() {
+                @Override
+                public void onSend(QuickSendMediaPopup.QuickSendMediaEntry e) {
+                    openQuickSendPreview(e);
+                }
+
+                @Override
+                public void onUserDismiss(QuickSendMediaPopup.QuickSendMediaEntry e) {
+                    // Already persisted on show(); nothing extra to do.
+                }
+            });
+        });
+    }
+
+    private void rememberQuickSendDismissed(QuickSendMediaPopup.QuickSendMediaEntry e) {
+        if (e == null) return;
+        quickSendDismissedIds.add(e.id);
+        if (e.dateAdded > 0) {
+            quickSendPauseTimeSec = Math.max(quickSendPauseTimeSec, e.dateAdded);
+        }
+        long prev = xyz.nextalone.nnngram.config.ConfigManager
+            .getLongOrDefault(xyz.nextalone.nnngram.utils.Defines.quickSendMediaLastDismissedId, 0L);
+        if (e.id > prev) {
+            xyz.nextalone.nnngram.config.ConfigManager
+                .putLong(xyz.nextalone.nnngram.utils.Defines.quickSendMediaLastDismissedId, e.id);
+        }
+    }
+
+    private void openQuickSendPreview(QuickSendMediaPopup.QuickSendMediaEntry e) {
+        if (e == null || getParentActivity() == null) {
+            return;
+        }
+        if (!checkSlowModeAlert()) {
+            return;
+        }
+        final String path = e.path;
+        if (path == null) {
+            // No file path (rare, scoped-storage edge case) - fall back to direct send via URI.
+            sendQuickMediaEntry(e);
+            return;
+        }
+        Pair<Integer, Integer> orientation = AndroidUtilities.getImageOrientation(path);
+        final MediaController.PhotoEntry photoEntry =
+            new MediaController.PhotoEntry(0, 0, 0, path, orientation.first, false, 0, 0, 0)
+                .setOrientation(orientation);
+        final ArrayList<Object> list = new ArrayList<>();
+        list.add(photoEntry);
+
+        PhotoViewer.getInstance().setParentActivity(this, themeDelegate);
+        if (PhotoViewer.getInstance().isVisible()) {
+            PhotoViewer.getInstance().closePhoto(false, false);
+        }
+        PhotoViewer.getInstance().openPhotoForSelect(list, 0, 0, false, new PhotoViewer.EmptyPhotoViewerProvider() {
+            @Override
+            public void sendButtonPressed(int index, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, int scheduleRepeatPeriod, boolean forceDocument) {
+                // User confirmed from the preview: persist dismissal and send.
+                rememberQuickSendDismissed(e);
+                sendMedia(photoEntry, videoEditedInfo, notify, scheduleDate, scheduleRepeatPeriod, forceDocument, 0);
+            }
+
+            @Override
+            public boolean canScrollAway() {
+                return false;
+            }
+
+            @Override
+            public boolean canCaptureMorePhotos() {
+                return false;
+            }
+        }, this);
+    }
+
+    private void sendQuickMediaEntry(QuickSendMediaPopup.QuickSendMediaEntry e) {
+        if (e == null || (e.path == null && e.uri == null)) {
+            return;
+        }
+        if (!checkSlowModeAlert()) {
+            return;
+        }
+        rememberQuickSendDismissed(e);
+        SendMessagesHelper.prepareSendingPhoto(
+            getAccountInstance(),
+            e.path,
+            e.uri,
+            dialog_id,
+            replyingMessageObject,
+            getThreadMessage(),
+            replyingQuote,
+            null,
+            null,
+            null,
+            null,
+            0,
+            null,
+            true,
+            0,
+            chatMode,
+            quickReplyShortcut,
+            getQuickReplyId()
+        );
+        afterMessageSend();
     }
 
     @Override
@@ -29840,6 +30008,10 @@ public class ChatActivity extends BaseFragment implements
         if (contentView != null) {
             contentView.onPause();
         }
+        if (quickSendMediaPopup != null) {
+            quickSendMediaPopup.dismiss(false);
+        }
+        quickSendPauseTimeSec = System.currentTimeMillis() / 1000L;
         if (chatMode == 0 || chatMode == MODE_SAVED && getUserConfig().getClientUserId() == getSavedDialogId() || chatMode == MODE_SUGGESTIONS && ChatObject.isMonoForum(currentChat)) {
             saveDraft();
             getMessagesController().cancelTyping(0, dialog_id, threadMessageId);
@@ -31585,9 +31757,80 @@ public class ChatActivity extends BaseFragment implements
                         popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
                     }
                 }
+                // === Strip hidden options before building popup (Nnngram) ===
+                for (int a = items.size() - 1; a >= 0; a--) {
+                    if (MessageMenuCompact.isHidden(options.get(a))) {
+                        items.remove(a);
+                        options.remove(a);
+                        icons.remove(a);
+                    }
+                }
+                // === Compact icon bar pre-pass (Nnngram) ===
+                final HashSet<Integer> compactIndices = new HashSet<>();
+                for (int a = 0, N = items.size(); a < N; a++) {
+                    if (MessageMenuCompact.isCompact(options.get(a))) {
+                        compactIndices.add(a);
+                    }
+                }
+                GridLayout compactIconBar = null;
+                if (!compactIndices.isEmpty()) {
+                    int n = compactIndices.size();
+                    int cols = MessageMenuCompact.pickCols(n);
+                    GridLayout grid = new GridLayout(getParentActivity());
+                    grid.setColumnCount(cols);
+                    grid.setUseDefaultMargins(false);
+                    grid.setMinimumWidth(AndroidUtilities.dp(200));
+                    int cellSize = AndroidUtilities.dp(44);
+                    int iconPad = AndroidUtilities.dp(10);
+                    for (int a = 0, N = items.size(); a < N; a++) {
+                        if (!compactIndices.contains(a)) continue;
+                        ImageView iv = new ImageView(getParentActivity());
+                        iv.setImageResource(icons.get(a));
+                        iv.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon), PorterDuff.Mode.MULTIPLY));
+                        iv.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_dialogButtonSelector), Theme.RIPPLE_MASK_CIRCLE_AUTO));
+                        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                        iv.setPadding(iconPad, iconPad, iconPad, iconPad);
+                        iv.setContentDescription(items.get(a));
+                        final int idx = a;
+                        iv.setOnClickListener(v1 -> {
+                            if (selectedObject == null || idx >= options.size()) return;
+                            processSelectedOption(options.get(idx));
+                        });
+                        iv.setOnLongClickListener(v2 -> {
+                            if (selectedObject == null || idx >= options.size()) return false;
+                            processLongClickSelectedOption(options.get(idx));
+                            return true;
+                        });
+                        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+                        lp.width = 0;
+                        lp.height = cellSize;
+                        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, GridLayout.FILL, 1f);
+                        lp.rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1);
+                        grid.addView(iv, lp);
+                    }
+                    compactIconBar = grid;
+                }
+                int firstVisibleIndex = -1, lastVisibleIndex = -1;
+                for (int a = 0, N = items.size(); a < N; a++) {
+                    if (compactIndices.contains(a)) continue;
+                    if (firstVisibleIndex == -1) firstVisibleIndex = a;
+                    lastVisibleIndex = a;
+                }
+                final boolean compactBarTop = false;
+                final boolean hasTextItems = firstVisibleIndex != -1;
+                if (compactIconBar != null && compactBarTop) {
+                    popupLayout.addView(compactIconBar, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+                    if (hasTextItems) {
+                        popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
+                    }
+                }
                 scrimPopupWindowItems = new ActionBarMenuSubItem[items.size()];
                 for (int a = 0, N = items.size(); a < N; a++) {
-                    ActionBarMenuSubItem cell = new ActionBarMenuSubItem(getParentActivity(), a == 0, a == N - 1, themeDelegate);
+                    if (compactIndices.contains(a)) {
+                        scrimPopupWindowItems[a] = null;
+                        continue;
+                    }
+                    ActionBarMenuSubItem cell = new ActionBarMenuSubItem(getParentActivity(), a == firstVisibleIndex, a == lastVisibleIndex, themeDelegate);
                     cell.setMinimumWidth(AndroidUtilities.dp(200));
                     cell.setTextAndIcon(items.get(a), icons.get(a));
                     Integer option = options.get(a);
@@ -31682,6 +31925,12 @@ public class ChatActivity extends BaseFragment implements
                             }
                         }, waitForQr, onQrDetectionDone);
                     }
+                }
+                if (compactIconBar != null && !compactBarTop) {
+                    if (hasTextItems) {
+                        popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
+                    }
+                    popupLayout.addView(compactIconBar, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
                 }
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.video_processing_pending) {
                     popupLayout.addView(new ActionBarPopupWindow.GapView(contentView.getContext(), themeDelegate), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 8));
@@ -42169,6 +42418,7 @@ public class ChatActivity extends BaseFragment implements
             }
             if (scrimPopupWindowItems != null) {
                 for (int a = 0; a < scrimPopupWindowItems.length; a++) {
+                    if (scrimPopupWindowItems[a] == null) continue;
                     scrimPopupWindowItems[a].setColors(getThemedColor(Theme.key_actionBarDefaultSubmenuItem), getThemedColor(Theme.key_actionBarDefaultSubmenuItemIcon));
                     scrimPopupWindowItems[a].setSelectorColor(getThemedColor(Theme.key_dialogButtonSelector));
                 }
