@@ -191,6 +191,12 @@ public class AnimatedEmojiSpan extends ReplacementSpan {
         }
     }
 
+    public AnimatedEmojiSpan setSize(int size) {
+        this.size = size;
+        return this;
+    }
+
+
     public static void applyFontMetricsForString(CharSequence text, Paint textPaint) {
         if (text instanceof Spannable) {
             AnimatedEmojiSpan[] spans = ((Spannable) text).getSpans(0, text.length(), AnimatedEmojiSpan.class);
@@ -773,7 +779,7 @@ public class AnimatedEmojiSpan extends ReplacementSpan {
             holders.add(holder);
             SpansChunk chunkByLayout = groupedByLayout.get(layout);
             if (chunkByLayout == null) {
-                chunkByLayout = new SpansChunk(holder.view, layout, holder.invalidateInParent);
+                chunkByLayout = new SpansChunk(holder.view, layout, false);
                 groupedByLayout.put(layout, chunkByLayout);
                 backgroundDrawingArray.add(chunkByLayout);
             }
@@ -858,7 +864,7 @@ public class AnimatedEmojiSpan extends ReplacementSpan {
         final View view;
         ArrayList<AnimatedEmojiHolder> holders = new ArrayList<>();
         DrawingInBackgroundThreadDrawable backgroundThreadDrawable;
-        private boolean allowBackgroundRendering;
+        private final boolean allowBackgroundRendering;
 
         public SpansChunk(View view, Layout layout, boolean allowBackgroundRendering) {
             this.layout = layout;

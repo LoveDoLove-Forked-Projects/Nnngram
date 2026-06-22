@@ -258,7 +258,6 @@ public class AndroidUtilities {
     public final static String TYPEFACE_ROBOTO_MEDIUM_ITALIC = "fonts/rmediumitalic.ttf";
     public final static String TYPEFACE_ROBOTO_MONO = "fonts/rmono.ttf";
     public final static String TYPEFACE_MERRIWEATHER_BOLD = "fonts/mw_bold.ttf";
-    public final static String TYPEFACE_COURIER_NEW_BOLD = "fonts/courier_new_bold.ttf";
 
     public static Typeface mediumTypeface;
     public static ThreadLocal<byte[]> readBufferLocal = new ThreadLocal<>();
@@ -1460,8 +1459,10 @@ public class AndroidUtilities {
         if (context == null || (AndroidUtilities.statusBarHeight > 0 && !force)) {
             return;
         }
-        AndroidUtilities.statusBarHeight = getStatusBarHeight(context);
-        AndroidUtilities.navigationBarHeight = getNavigationBarHeight(context);
+        if (BuildVars.USE_LEGACY_SYSTEM_INSETS) {
+            AndroidUtilities.statusBarHeight = getStatusBarHeight(context);
+            AndroidUtilities.navigationBarHeight = getNavigationBarHeight(context);
+        }
     }
 
     public static int getStatusBarHeight(Context context) {
@@ -2565,23 +2566,16 @@ public class AndroidUtilities {
             } else {
                 return new String[]{locale.replace('_', '-')};
             }
-        } catch (Exception ignore) {
-
-        }
+        } catch (Exception ignore) {}
         return new String[]{"en"};
     }
 
     public static void hideKeyboard(View view) {
-        if (view == null) {
-            return;
-        }
+        if (view == null) return;
         try {
-            InputMethodManager imm = (InputMethodManager) view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (!imm.isActive()) {
-                return;
-            }
+            final InputMethodManager imm = (InputMethodManager) view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (!imm.isActive()) return;
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-
         } catch (Exception e) {
             FileLog.e(e);
         }
@@ -2984,6 +2978,13 @@ public class AndroidUtilities {
 
     public static boolean isTablet() {
         return isTabletInternal() && !SharedConfig.forceDisableTabletMode;
+    }
+
+    public static boolean isFold() {
+        return (
+            ApplicationLoader.applicationContext != null &&
+            ApplicationLoader.applicationContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_SENSOR_HINGE_ANGLE)
+        );
     }
 
     public static boolean isSmallScreen() {
@@ -4266,7 +4267,7 @@ public class AndroidUtilities {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             MimeTypeMap myMime = MimeTypeMap.getSingleton();
-            int idx = fileName.lastIndexOf('.');
+            int idx = fileName == null ? -1 : fileName.lastIndexOf('.');
             if (idx != -1) {
                 String ext = fileName.substring(idx + 1);
                 if (restrict && MessageObject.isV(ext)) {
@@ -4706,7 +4707,7 @@ public class AndroidUtilities {
             tableView.addRow(getString(R.string.UseProxyUsername), user);
         }
         if (!TextUtils.isEmpty(password)) {
-            tableView.addRow(getString(R.string.UseProxyPassword), user);
+            tableView.addRow(getString(R.string.UseProxyPassword), password);
         }
         final ButtonSpan.TextViewButtons[] statusTextView = new ButtonSpan.TextViewButtons[1];
         tableView.addRow(getString(R.string.ProxyStatus), "", statusTextView);
@@ -7013,14 +7014,48 @@ public class AndroidUtilities {
         LaunchActivity.instance.presentFragment(new DebugRecordingCanvasReplayFragment(c));
     }
 
-    public static <A, B> B find(ArrayList<A> array, Class<B> clazz) {
+    public static <A, B> B find(List<A> array, Class<B> clazz) {
         if (array == null) {
             return null;
         }
-        for (A obj : array) {
+        for (int i = 0; i < array.size(); ++i) {
+            final A obj = array.get(i);
             if (clazz.isInstance(obj)) {
                 return clazz.cast(obj);
             }
+        }
+        return null;
+    }
+
+    public static <A, B> B findLast(List<A> array, Class<B> clazz) {
+        if (array == null) {
+            return null;
+        }
+        for (int i = array.size() - 1; i >= 0; --i) {
+            final A obj = array.get(i);
+            if (clazz.isInstance(obj)) {
+                return clazz.cast(obj);
+            }
+        }
+        return null;
+    }
+
+    public static TLRPC.Photo findPhoto(List<TLRPC.Photo> array, long id) {
+        if (array == null) return null;
+        for (int i = 0; i < array.size(); ++i) {
+            final TLRPC.Photo photo = array.get(i);
+            if (photo != null && photo.id == id)
+                return photo;
+        }
+        return null;
+    }
+
+    public static TLRPC.Document findDocument(List<TLRPC.Document> array, long id) {
+        if (array == null) return null;
+        for (int i = 0; i < array.size(); ++i) {
+            final TLRPC.Document doc = array.get(i);
+            if (doc != null && doc.id == id)
+                return doc;
         }
         return null;
     }

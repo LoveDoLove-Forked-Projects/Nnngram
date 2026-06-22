@@ -61,17 +61,24 @@ public class CheckBoxBase {
     private static Paint forbidPaint;
 
     private float alpha = 1;
+
     public void setAlpha(float alpha) {
+        if (this.alpha == alpha) {
+            return;
+        }
         this.alpha = alpha;
         invalidate();
     }
 
     private boolean cutCheck;
-    public void setCuttingCheck(boolean cutCheck) {
-        if (this.cutCheck == cutCheck) return;
-        this.cutCheck = cutCheck;
 
+    public void setCuttingCheck(boolean cutCheck) {
+        if (this.cutCheck == cutCheck) {
+            return;
+        }
+        this.cutCheck = cutCheck;
         checkPaint.setXfermode(cutCheck ? new PorterDuffXfermode(PorterDuff.Mode.CLEAR) : null);
+        invalidate();
     }
 
     private Path path = new Path();
@@ -137,11 +144,19 @@ public class CheckBoxBase {
     }
 
     public void setSize(float size) {
+        if (this.size == size) {
+            return;
+        }
         this.size = size;
+        invalidate();
     }
 
     public void setResourcesProvider(Theme.ResourcesProvider resourcesProvider) {
+        if (this.resourcesProvider == resourcesProvider) {
+            return;
+        }
         this.resourcesProvider = resourcesProvider;
+        invalidate();
     }
 
     public void onAttachedToWindow() {
@@ -153,22 +168,40 @@ public class CheckBoxBase {
     }
 
     public void setBounds(int x, int y, int width, int height) {
+        int right = x + width;
+        int bottom = y + height;
+        if (bounds.left == x && bounds.top == y && bounds.right == right && bounds.bottom == bottom) {
+            return;
+        }
         bounds.left = x;
         bounds.top = y;
-        bounds.right = x + width;
-        bounds.bottom = y + height;
+        bounds.right = right;
+        bounds.bottom = bottom;
+        invalidate();
     }
 
     public void setCustomRadius(float customRadius) {
+        if (this.customRadius == customRadius) {
+            return;
+        }
         this.customRadius = customRadius;
+        invalidate();
     }
 
     public void setCustomRadiusFactor(float customRadiusFactor) {
+        if (this.customRadiusFactor == customRadiusFactor) {
+            return;
+        }
         this.customRadiusFactor = customRadiusFactor;
+        invalidate();
     }
 
     public void setDrawUnchecked(boolean value) {
+        if (drawUnchecked == value) {
+            return;
+        }
         drawUnchecked = value;
+        invalidate();
     }
 
     public boolean getDrawUnchecked() {
@@ -196,6 +229,7 @@ public class CheckBoxBase {
     }
 
     private void invalidate() {
+        if (parentView == null) return;
         if (parentView.getParent() != null) {
             View parent = (View) parentView.getParent();
             parent.invalidate();
@@ -217,10 +251,17 @@ public class CheckBoxBase {
     }
 
     public void setEnabled(boolean value) {
+        if (enabled == value) {
+            return;
+        }
         enabled = value;
+        invalidate();
     }
 
     public void setBackgroundType(int type) {
+        if (backgroundType == type) {
+            return;
+        }
         backgroundType = type;
         if (type == 12 || type == 13) {
             backgroundPaint.setStrokeWidth(dp(1));
@@ -234,6 +275,7 @@ public class CheckBoxBase {
         } else if (type != 0) {
             backgroundPaint.setStrokeWidth(dp(1.5f));
         }
+        invalidate();
     }
 
     public void cancelCheckAnimator() {
@@ -263,6 +305,9 @@ public class CheckBoxBase {
     }
 
     public void setColor(int background, int background2, int check) {
+        if (backgroundColorKey == background && background2ColorKey == background2 && checkColorKey == check) {
+            return;
+        }
         backgroundColorKey = background;
         background2ColorKey = background2;
         checkColorKey = check;
@@ -270,38 +315,66 @@ public class CheckBoxBase {
     }
 
     public void setStrokeBackgroundColor(int key) {
+        if (strokeBackgroundKey == key) {
+            return;
+        }
         strokeBackgroundKey = key;
         invalidate();
     }
 
     public void setStrokeBackgroundWidth(int width) {
+        if (strokeBackgroundWidth == width) {
+            return;
+        }
         strokeBackgroundWidth = width;
         invalidate();
     }
 
     public void setBackgroundColor(int backgroundColor) {
+        if (this.backgroundColor == backgroundColor) {
+            return;
+        }
         this.backgroundColor = backgroundColor;
         invalidate();
     }
 
     public void setBackgroundDrawable(Theme.MessageDrawable drawable) {
+        if (messageDrawable == drawable) {
+            return;
+        }
         messageDrawable = drawable;
+        invalidate();
     }
 
     public void setUseDefaultCheck(boolean value) {
+        if (useDefaultCheck == value) {
+            return;
+        }
         useDefaultCheck = value;
+        invalidate();
     }
 
     public void setBackgroundAlpha(float alpha) {
+        if (backgroundAlpha == alpha) {
+            return;
+        }
         backgroundAlpha = alpha;
+        invalidate();
     }
 
     public void setNum(int num) {
+        String newText = null;
         if (num >= 0) {
-            checkedText = "" + (num + 1);
-        } else if (checkAnimator == null) {
-            checkedText = null;
+            newText = "" + (num + 1);
+        } else if (checkAnimator != null) {
+            newText = checkedText;
         }
+
+        if (checkedText == null ? newText == null : checkedText.equals(newText)) {
+            return;
+        }
+
+        checkedText = newText;
         invalidate();
     }
 
@@ -311,8 +384,11 @@ public class CheckBoxBase {
 
     public void setChecked(int num, boolean checked, boolean animated) {
         if (num >= 0) {
-            checkedText = "" + (num + 1);
-            invalidate();
+            String newText = "" + (num + 1);
+            if (checkedText == null || !checkedText.equals(newText)) {
+                checkedText = newText;
+                invalidate();
+            }
         }
         if (checked == isChecked) {
             return;
@@ -344,6 +420,7 @@ public class CheckBoxBase {
         int cx = bounds.centerX();
         int cy = bounds.centerY();
 
+        final boolean cutCheck = this.cutCheck && roundProgress > 0 && progress >= 0.5f && !forbidden && checkedText == null;
         if (cutCheck) {
             canvas.saveLayerAlpha(cx - rad, cy - rad, cx + rad, cy + rad, 255, Canvas.ALL_SAVE_FLAG);
         }
@@ -460,7 +537,7 @@ public class CheckBoxBase {
                 paint.setColor(getThemedColor(backgroundColorKey));
             } else if (backgroundColor != 0) {
                 paint.setColor(backgroundColor);
-            } else  {
+            } else {
                 paint.setColor(getThemedColor(enabled ? Theme.key_checkbox : Theme.key_checkboxDisabled));
             }
             if (forbidden) {
@@ -481,7 +558,11 @@ public class CheckBoxBase {
                 float sizeHalf = dp(size) / 2f;
                 int restoreCount = canvas.save();
                 canvas.translate(cx - sizeHalf, cy - sizeHalf);
-                canvas.saveLayerAlpha(0, 0, dp(size), dp(size), 255, Canvas.ALL_SAVE_FLAG);
+
+                final boolean needSaveLayer = roundProgress < 1;
+                if (needSaveLayer) {
+                    canvas.saveLayerAlpha(0, 0, dp(size), dp(size), 255, Canvas.ALL_SAVE_FLAG);
+                }
                 Paint circlePaint = circlePaintProvider.provide(null);
                 if (backgroundType == 12 || backgroundType == 13) {
                     int a = circlePaint.getAlpha();
@@ -496,11 +577,16 @@ public class CheckBoxBase {
                     canvas.drawRoundRect(sizeHalf - rad, sizeHalf - rad, sizeHalf + rad, sizeHalf + rad, rad2, rad2, circlePaint);
                     final float r = rad * (1.0f - roundProgress);
                     final float rr = lerp(r, customRadius, customRadiusFactor);
-                    canvas.drawRoundRect(sizeHalf - r, sizeHalf - r, sizeHalf + r, sizeHalf + r, rr, rr, Theme.PAINT_CLEAR);
+                    if (needSaveLayer && r > 0) {
+                        canvas.drawRoundRect(sizeHalf - r, sizeHalf - r, sizeHalf + r, sizeHalf + r, rr, rr, Theme.PAINT_CLEAR);
+                    }
                 } else {
                     rad -= dp(0.5f);
                     canvas.drawCircle(sizeHalf, sizeHalf, rad, circlePaint);
-                    canvas.drawCircle(sizeHalf, sizeHalf, rad * (1.0f - roundProgress), Theme.PAINT_CLEAR);
+                    final float r = rad * (1.0f - roundProgress);
+                    if (needSaveLayer && r > 0) {
+                        canvas.drawCircle(sizeHalf, sizeHalf, r, Theme.PAINT_CLEAR);
+                    }
                 }
                 canvas.restoreToCount(restoreCount);
             }
@@ -580,7 +666,11 @@ public class CheckBoxBase {
     }
 
     public void setCirclePaintProvider(GenericProvider<Void, Paint> circlePaintProvider) {
+        if (this.circlePaintProvider == circlePaintProvider) {
+            return;
+        }
         this.circlePaintProvider = circlePaintProvider;
+        invalidate();
     }
 
     private int getThemedColor(int key) {

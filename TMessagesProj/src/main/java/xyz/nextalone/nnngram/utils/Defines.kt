@@ -99,7 +99,6 @@ object Defines {
     @BooleanConfig const val markdownDisabled = "markdownEnable"
     @BooleanConfig(true) const val markdownParseLinks = "markdownParseLinks"
     @BooleanConfig(true) const val newMarkdownParser = "newMarkdownParser"
-    @BooleanConfig(true)  const val photoViewerEdgeToEdge = "photoViewerEdgeToEdge"
     @BooleanConfig const val showRPCError = "showRPCError"
     @BooleanConfig const val showFragmentSwitchToast = "showFragmentSwitchToast"
     @BooleanConfig const val enablePanguOnSending = "enablePanguOnSending"
@@ -267,19 +266,6 @@ object Defines {
     @BooleanConfig const val filterZalgo = "filterZalgo"
     @BooleanConfig const val ignoreFolderUnreadCount = "ignoreFolderUnreadCount"
 
-    /**
-     * Retention duration (in seconds) for read dialogs that should still be displayed
-     * inside the "Unread" dialog filter / folder.
-     * 0 = off (default, original behavior: read dialog disappears immediately)
-     * 300 = 5 minutes
-     * 1800 = 30 minutes
-     * 7200 = 2 hours
-     */
-    @IntConfig(0) const val unreadDialogRetention = "unreadDialogRetention"
-    const val unreadDialogRetentionOff = 0
-    const val unreadDialogRetention5Min = 300
-    const val unreadDialogRetention30Min = 1800
-    const val unreadDialogRetention2Hour = 7200
     @BooleanConfig const val ignoreChatStrict = "ignoreChatStrict"
     @StringConfig("Nnngram") const val customTitle = "customTitle"
     @StringConfig("") const val textStyleSettings = "textStyleSettings"
@@ -302,6 +288,7 @@ object Defines {
     @BooleanConfig const val hideSavedAndArchivedMessagesInList = "hideSavedAndArchivedMessagesInList"
     @BooleanConfig(true) const val showIdAndDc = "showIdAndDc"
     @BooleanConfig const val scrollToNextUnreadWhenAtTop = "scrollToNextUnreadWhenAtTop"
+    @BooleanConfig const val showRecentChatsOnTabLongPress = "showRecentChatsOnTabLongPress"
 
     // Drawer List
     @BooleanConfig(true) const val showNewGroup = "showNewGroup"

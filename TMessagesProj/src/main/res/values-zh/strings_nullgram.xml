@@ -369,11 +369,6 @@
     <string name="MergeMessage">合并消息</string>
     <string name="filterZalgo">过滤「Zalgo」符号</string>
     <string name="ignoreFolderUnreadCount">忽略文件夹标签上的未读计数</string>
-    <string name="unreadDialogRetention">在「未读」中保留最近会话</string>
-    <string name="unreadDialogRetentionOff">关闭</string>
-    <string name="unreadDialogRetention5Min">5 分钟</string>
-    <string name="unreadDialogRetention30Min">30 分钟</string>
-    <string name="unreadDialogRetention2Hour">2 小时</string>
     <string name="customTitle">自定义标题</string>
     <string name="setCustomTitle">设置自定义标题</string>
     <string name="drawerList">侧边栏列表</string>
@@ -404,6 +399,7 @@
     <string name="showProxyEntryInDrawer">在侧滑栏显示代理入口</string>
     <string name="hideSavedAndArchivedMessagesInList">在列表里隐藏收藏夹和已归档消息</string>
     <string name="scrollToNextUnreadWhenAtTop">在列表顶部时点击聊天标签跳转到下一条未读</string>
+    <string name="showRecentChatsOnTabLongPress">长按聊天标签显示最近会话</string>
     <string name="NoUnreadChats">没有未读会话</string>
     <string name="messagePlaceholderInSaved">这里是您收藏的消息</string>
     <string name="messagePlaceholderInArchived">这里是您已归档的消息</string>
@@ -413,7 +409,6 @@
     <string name="PlayerDecoderHardware">仅限设备解码器</string>
     <string name="PlayerDecoderPerferHW">设备解码器优先</string>
     <string name="showIdAndDc">显示用户 ID 和数据中心</string>
-    <string name="PhotoViewerEdgeToEdge">启用 PhotoViewer 边到边</string>
     <string name="ProviderLLMTranslate">大模型翻译</string>
     <string name="LLMTranslatorSettings">大模型翻译设置</string>
     <string name="LLMProvider">大模型提供者</string>

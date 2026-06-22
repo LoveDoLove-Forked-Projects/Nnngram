@@ -168,7 +168,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import me.vkryl.core.BitwiseUtils;
 
-public class ChatActionCell extends BaseCell implements DownloadController.FileDownloadProgressListener, NotificationCenter.NotificationCenterDelegate {
+public class ChatActionCell extends BaseCell implements DownloadController.FileDownloadProgressListener, NotificationCenter.NotificationCenterDelegate, IMessageCell {
     private final static boolean USE_PREMIUM_GIFT_LOCAL_STICKER = false;
     private final static boolean USE_PREMIUM_GIFT_MONTHS_AS_EMOJI_NUMBERS = false;
 
@@ -321,6 +321,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
     public boolean isAllChats;
     public boolean isForum;
     public boolean isMonoForum;
+    public boolean isBotForum;
     public boolean isSideMenued;
     public boolean isSideMenuEnabled;
     public float sideMenuAlpha;
@@ -1032,7 +1033,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
             imageReceiver.setDelegate(null);
             imageReceiver.setImageBitmap((Bitmap) null);
         }
-        if (firstInChat && isAllChats && isSideMenued && (isForum || isMonoForum)) {
+        if (firstInChat && isAllChats && isSideMenued && (isForum || isMonoForum || isBotForum)) {
             topicSeparatorTopPadding = dp(33);
             if (topicSeparator == null) {
                 topicSeparator = new TopicSeparator(currentAccount, this, themeDelegate, true);
@@ -1080,6 +1081,18 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
     public MessageObject getMessageObject() {
         return currentMessageObject;
+    }
+
+    @Override
+    public ReactionsLayoutInBubble getReactionsLayout() {
+        return reactionsLayoutInBubble;
+    }
+
+    @Override
+    public void didPressReactionFromLayout(TLRPC.ReactionCount reaction, boolean longpress, float x, float y) {
+        if (delegate != null) {
+            delegate.didPressReaction(this, reaction, longpress, x, y);
+        }
     }
 
     public ImageReceiver getPhotoImage() {
@@ -3431,7 +3444,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         }
         if (currentMessageObject == null || !currentMessageObject.isRepostPreview) {
             canvas.drawPath(backgroundPath, backgroundPaint);
-            if (hasGradientService()) {
+            if (hasGradientService() && darkenBackgroundPaint.getAlpha() > 0) {
                 canvas.drawPath(backgroundPath, darkenBackgroundPaint);
             }
             if (dimAmount > 0) {
@@ -3742,6 +3755,9 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
     public void drawReactionsLayout(Canvas canvas, boolean fromParent, Integer only) {
         final float alpha = fromParent ? getAlpha() : 1.0f;
+        if (alpha <= 0) {
+            return;
+        }
         if (themeDelegate != null) {
             themeDelegate.applyServiceShaderMatrix(getMeasuredWidth(), backgroundHeight, viewTranslationX, viewTop + dp(4));
         } else {
@@ -4090,6 +4106,10 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         return transitionParams;
     }
 
+    public float getDeltaTop() { return 0; }
+    public float getDeltaLeft() { return 0; }
+    public float getDeltaRight() { return 0; }
+    public float getDeltaBottom() { return 0; }
 
     public void setScrimReaction(Integer scrimViewReaction) {
         reactionsLayoutInBubble.setScrimReaction(scrimViewReaction);

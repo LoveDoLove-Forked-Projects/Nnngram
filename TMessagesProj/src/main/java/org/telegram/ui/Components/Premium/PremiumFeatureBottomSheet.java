@@ -128,7 +128,7 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
                 if (isPortrait) {
                     contentHeight = MeasureSpec.getSize(widthMeasureSpec);
                 } else {
-                    contentHeight = (int) (MeasureSpec.getSize(heightMeasureSpec) * 0.65f);
+                    contentHeight = (int) (Math.min(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec)) * 0.8f);
                 }
                 super.onMeasure(widthMeasureSpec, heightMeasureSpec);
             }
@@ -186,13 +186,14 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
                 canvas.save();
                 canvas.clipRect(0, 0, getMeasuredWidth(), getMeasuredHeight());
                 gradientTools.paint.setAlpha(gradientAlpha);
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(12) - 1, dp(12) - 1, gradientTools.paint);
+                canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(24) - 1, dp(24) - 1, gradientTools.paint);
                 canvas.restore();
                 super.dispatchDraw(canvas);
             }
         };
 
         closeLayout = new FrameLayout(getContext());
+        closeLayout.setContentDescription(getString(R.string.Close));
         ImageView closeImage = new ImageView(getContext());
         closeImage.setImageResource(R.drawable.msg_close);
         closeImage.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(12), ColorUtils.setAlphaComponent(Color.WHITE, 40), ColorUtils.setAlphaComponent(Color.WHITE, 100)));
@@ -500,14 +501,14 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
                 }
             }
 
-            Path path = new Path();
+            private final Path path = new Path();
 
             @Override
             protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
                 if (child == scrollView) {
                     canvas.save();
                     path.rewind();
-                    AndroidUtilities.rectTmp.set(0, topCurrentOffset + dp(18), getMeasuredWidth(), getMeasuredHeight());
+                    AndroidUtilities.rectTmp.set(getPaddingLeft(), topCurrentOffset + dp(18), getMeasuredWidth() - getPaddingRight(), getMeasuredHeight());
                     path.addRoundRect(AndroidUtilities.rectTmp, dp(18), dp(18), Path.Direction.CW);
                     canvas.clipPath(path);
                     super.drawChild(canvas, child, drawingTime);
@@ -694,6 +695,8 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
             }
             addView(description, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 21, 10, 21, 16));
 
+            setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+
             setClipChildren(false);
         }
 
@@ -704,15 +707,7 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
                 ((BaseListPageView) topView).setTopOffset(topGlobalOffset);
             }
             topView.getLayoutParams().height = contentHeight;
-            description.setVisibility(isPortrait ? View.VISIBLE : View.GONE);
-            MarginLayoutParams layoutParams = (MarginLayoutParams) title.getLayoutParams();
-            if (isPortrait) {
-                layoutParams.topMargin = dp(20);
-                layoutParams.bottomMargin = 0;
-            } else {
-                layoutParams.topMargin = dp(10);
-                layoutParams.bottomMargin = dp(10);
-            }
+            description.setVisibility(View.VISIBLE);
             ((MarginLayoutParams) topView.getLayoutParams()).bottomMargin = 0;
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
             if (topViewOnFullHeight) {
@@ -867,8 +862,7 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
             };
             return recyclerListView;
         }
-        VideoScreenPreview preview = new VideoScreenPreview(context, svgIcon, currentAccount, featureData.type, resourcesProvider);
-        return preview;
+        return new VideoScreenPreview(context, svgIcon, currentAccount, featureData.type, resourcesProvider);
     }
 
     @Override
